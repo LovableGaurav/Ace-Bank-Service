@@ -1,0 +1,87 @@
+user:
+  # Updated to fetch essential session data
+  login_details: >
+    SELECT u.USER_ID, u.FIRST_NAME, u.LAST_NAME, u.EMAIL, a.BALANCE 
+    FROM USERS u 
+    JOIN ACCOUNTS a ON u.USER_ID = a.USER_ID 
+    WHERE a.ACCOUNT_NO = ? AND u.PASSWORD_HASH = ?
+  signup: "INSERT INTO USERS (FIRST_NAME, LAST_NAME, AADHAAR_NO, EMAIL, PASSWORD_HASH) VALUES (?,?,?,?,?)"
+  recover_details: >
+    SELECT u.FIRST_NAME, u.LAST_NAME, a.ACCOUNT_NO 
+    FROM USERS u 
+    JOIN ACCOUNTS a ON u.USER_ID = a.USER_ID 
+    WHERE u.EMAIL = ?
+  get_password_by_acc: >
+    SELECT u.PASSWORD_HASH 
+    FROM USERS u 
+    JOIN ACCOUNTS a ON u.USER_ID = a.USER_ID 
+    WHERE a.ACCOUNT_NO = ?
+  # Fetches everything we need for the session in one go
+  get_details: >
+    SELECT u.FIRST_NAME, u.LAST_NAME, u.EMAIL, a.BALANCE, a.ACCOUNT_NO 
+    FROM USERS u 
+    JOIN ACCOUNTS a ON u.USER_ID = a.USER_ID 
+    WHERE a.ACCOUNT_NO = ?
+
+  # Updates the password hash for the user linked to this account
+  update_password: >
+    UPDATE USERS u
+    JOIN ACCOUNTS a ON u.USER_ID = a.USER_ID
+    SET u.PASSWORD_HASH = ?
+    WHERE a.ACCOUNT_NO = ?
+
+  # Forgot password / OTP reset
+  get_account_by_email: >
+    SELECT a.ACCOUNT_NO
+    FROM USERS u
+    JOIN ACCOUNTS a ON u.USER_ID = a.USER_ID
+    WHERE u.EMAIL = ?
+
+  password_reset_upsert: >
+    INSERT INTO PASSWORD_RESET_OTP (EMAIL, ACCOUNT_NO, OTP_HASH, EXPIRES_AT, ATTEMPTS, USED)
+    VALUES (?, ?, ?, ?, 0, 0)
+    ON DUPLICATE KEY UPDATE
+      ACCOUNT_NO = VALUES(ACCOUNT_NO),
+      OTP_HASH = VALUES(OTP_HASH),
+      EXPIRES_AT = VALUES(EXPIRES_AT),
+      ATTEMPTS = 0,
+      USED = 0,
+      CREATED_AT = CURRENT_TIMESTAMP
+
+  password_reset_get: >
+    SELECT EMAIL, ACCOUNT_NO, OTP_HASH, EXPIRES_AT, ATTEMPTS, USED
+    FROM PASSWORD_RESET_OTP
+    WHERE EMAIL = ?
+
+  password_reset_inc_attempt: >
+    UPDATE PASSWORD_RESET_OTP
+    SET ATTEMPTS = ATTEMPTS + 1
+    WHERE EMAIL = ?
+
+  password_reset_mark_used: >
+    UPDATE PASSWORD_RESET_OTP
+    SET USED = 1
+    WHERE EMAIL = ?
+
+account:
+  create: "INSERT INTO ACCOUNTS (ACCOUNT_NO, USER_ID, BALANCE) VALUES (?,?,0.00)"
+  withdraw: "UPDATE ACCOUNTS SET BALANCE = BALANCE - ? WHERE ACCOUNT_NO = ? AND BALANCE >= ?"
+  deposit: "UPDATE ACCOUNTS SET BALANCE = BALANCE + ? WHERE ACCOUNT_NO = ?"
+  check_pw: >
+    SELECT u.PASSWORD_HASH, u.USER_ID FROM USERS u 
+    JOIN ACCOUNTS a ON u.USER_ID = a.USER_ID WHERE a.ACCOUNT_NO = ?
+  get_balance: "SELECT BALANCE FROM ACCOUNTS WHERE ACCOUNT_NO = ?"
+  withdraw_balance: "UPDATE ACCOUNTS SET BALANCE = BALANCE - ? WHERE ACCOUNT_NO = ? AND BALANCE >= ?"
+
+
+transaction:
+  log: "INSERT INTO TRANSACTIONS (SENDER_ACCOUNT, RECEIVER_ACCOUNT, AMOUNT, TX_TYPE, REMARK) VALUES (?, ?, ?, ?, ?)"
+  statement: "SELECT * FROM TRANSACTIONS WHERE SENDER_ACCOUNT = ? OR RECEIVER_ACCOUNT = ? ORDER BY CREATED_AT DESC"
+  get_daily_withdrawal_total: >
+    SELECT SUM(AMOUNT) FROM TRANSACTIONS 
+    WHERE SENDER_ACCOUNT = ? 
+    AND TX_TYPE = 'WITHDRAWAL' 
+    AND DATE(CREATED_AT) = CURDATE()
+  log_withdrawal: >
+    INSERT INTO TRANSACTIONS (SENDER_ACCOUNT, RECEIVER_ACCOUNT, AMOUNT, TX_TYPE, REMARK) 
+    VALUES (?, ?, ?, 'WITHDRAWAL', 'ATM/Counter Withdrawal')
