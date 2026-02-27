@@ -11,7 +11,11 @@ target/
 .idea/libraries/
 *.iws
 *.iml
-*.ipr
+
+src\main\webapp\WEB-INF\views\home.css
+src\main\webapp\WEB-INF\views\Home.jsp
+src\main\webapp\WEB-INF\views\home.js
+src\main\resources\application-dev.properties
 
 ### Eclipse ###
 .apt_generated
